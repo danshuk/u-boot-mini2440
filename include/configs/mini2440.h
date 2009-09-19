@@ -194,8 +194,8 @@
 #define CFG_USB_OHCI_MAX_ROOT_PORTS 	2
 
 #define CONFIG_USB_DEVICE	1
-#define CONFIG_USB_TTY		1
-#define CONFIG_USB_STORAGE	1
+#define CONFIG_USB_TTY		0
+#define CONFIG_USB_STORAGE	0
 #define CFG_CONSOLE_IS_IN_ENV	1
 #define CONFIG_USBD_VENDORID		0x1457	/* FIC */
 #define CONFIG_USBD_PRODUCTID_GSERIAL	0x5120	/* gserial */
@@ -242,7 +242,8 @@
 #if 1
 #define	CFG_ENV_IS_IN_NAND	1
 #define CFG_ENV_OFFSET_OOB	1	// dont define for CFG_ENV_IS_IN_FLASH
-#define CFG_ENV_SIZE		0x10000		/* 64k Total Size of Environment Sector */
+/* This size must be the size of a common denominator for the NAND erase block */
+#define CFG_ENV_SIZE		0x20000		/* 128k Total Size of Environment Sector */
 #else
 #define CFG_ENV_IS_IN_FLASH 1
 #define CFG_MY_ENV_OFFSET 0X40000
