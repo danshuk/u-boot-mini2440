@@ -249,13 +249,11 @@ int dram_init (void)
 	return 0;
 }
 
-/* The sum of all part_size[]s must equal to the NAND size, i.e., 0x4000000.
-   "initrd" is sized such that it can hold two uncompressed 16 bit 640*480
-   images: 640*480*2*2 = 1228800 < 1245184. */
+/* The sum of all part_size[]s must equal to the NAND size, i.e., 0x4000000 */
 
 unsigned int dynpart_size[] = {
-    CFG_UBOOT_SIZE, 0x20000, 0x200000, 0xa0000, 0x3d5c000-CFG_UBOOT_SIZE, 0 };
+    CFG_UBOOT_SIZE, 0x20000, 0x500000, 0xffffffff, 0 };
 char *dynpart_names[] = {
-    "u-boot", "u-boot_env", "kernel", "splash", "rootfs", NULL };
+    "u-boot", "u-boot_env", "kernel", "rootfs", NULL };
 
 

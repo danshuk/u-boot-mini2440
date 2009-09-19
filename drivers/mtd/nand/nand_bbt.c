@@ -1066,6 +1066,7 @@ int nand_create_mtd_dynpart(struct mtd_info *mtd)
 	int part;
 	char *mtdparts;
 	unsigned int cur_offs = 0;
+	unsigned int cumulated = 0;
 
 	mtdparts = malloc(MTDPARTS_MAX_SIZE); /* FIXME: bounds checking */
 	if (!mtdparts)
@@ -1078,6 +1079,11 @@ int nand_create_mtd_dynpart(struct mtd_info *mtd)
 	    CFG_NAND_DYNPART_MTD_KERNEL_NAME ":");
 
 	for (part = 0; dynpart_size[part] != 0; part++) {
+		if (dynpart_size[part] == 0xffffffff) {
+			dynpart_size[part] = mtd->size - cumulated;
+		} else {
+			cumulated += dynpart_size[part];
+		}
 		unsigned int bb_delta = 0;
 		unsigned int offs = 0;
 		char mtdpart[32];
