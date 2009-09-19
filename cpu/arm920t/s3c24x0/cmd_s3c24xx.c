@@ -349,6 +349,27 @@ static int reconfig_mpll(u_int16_t mhz)
 	return -1;
 }
 
+#include <linux/mtd/nand.h>
+#define nand_select()	(NFCONT &= ~(1 << 1))
+#define nand_deselect()	(NFCONT |= (1 << 1))
+#define nand_clear_RnB()	(NFSTAT |= (1 << 2))
+
+static unsigned short nand_read_id()
+{
+	unsigned short res = 0;
+
+	nand_select();
+	nand_clear_RnB();
+	
+	NFCMD = NAND_CMD_READID;
+	NFADDR = 0;
+	res = NFDATA8;
+	res = (res << 8) | NFDATA8;
+	nand_deselect();
+	
+	return res;
+}
+
 int do_s3c24xx ( cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
 {
 	if (!strcmp(argv[1], "speed")) {
@@ -371,6 +392,10 @@ int do_s3c24xx ( cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
 				print_cpu_speed();
 		} else
 			goto out_help;
+	} else if (!strcmp(argv[1], "probe")) {
+		unsigned short * nid = (unsigned short *)0x31fffff0;
+		printf("NAND id: 0x%04x, probed at boot: 0x%04x\n", nand_read_id(), *nid);
+		
 	} else {
 out_help:
 		printf("Usage:\n%s\n", cmdtp->usage);
@@ -389,6 +414,7 @@ U_BOOT_CMD(
 	"speed get - display current PLL speed config\n"
 	"s3c24xx speed list - display supporte PLL speed configs\n"
 	"s3c24xx speed set - set PLL speed\n"
+	"s3c24xx probe - probe autodetectable hardware bits\n"
 );
 
 #endif
