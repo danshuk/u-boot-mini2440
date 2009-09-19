@@ -280,7 +280,7 @@ ALL += $(obj)u-boot.srec $(obj)u-boot.bin $(obj)System.map $(U_BOOT_NAND) $(U_BO
 ifeq ($(ARCH),blackfin)
 ALL += $(obj)u-boot.ldr
 endif
-ALL += $(obj)u-boot-nand512.bin
+ALL += $(obj)u-boot-nand2k.bin
 ALL += $(obj)u-boot-nand16k.bin
 
 all:		$(ALL)
@@ -328,9 +328,9 @@ $(obj)u-boot:		depend $(SUBDIRS) $(OBJS) $(LIBS) $(LDSCRIPT)
 			--start-group $(__LIBS) --end-group $(PLATFORM_LIBS) \
 			-Map u-boot.map -o u-boot
 
-# make a file that can be written using "nand write ..." on 512 block NAND
-$(obj)u-boot-nand512.bin:	$(obj)u-boot.bin
-		dd if=$< of=$@ bs=512 conv=sync
+# make a file that can be written using "nand write ..." on 512 & 2K block NAND
+$(obj)u-boot-nand2k.bin:	$(obj)u-boot.bin
+		dd if=$< of=$@ bs=2K conv=sync
 $(obj)u-boot-nand16k.bin:	$(obj)u-boot.bin
 		dd if=$< of=$@ bs=16K conv=sync
 
