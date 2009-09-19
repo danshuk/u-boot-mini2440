@@ -56,6 +56,14 @@ static inline void nand_wait(void)
 		for (i=0; i<10; i++);
 }
 
+struct boot_nand_t {
+	int page_size;
+	int block_size;
+	int bad_block_offset;
+	unsigned long size;
+};
+
+#if 0
 #if defined(CONFIG_S3C2410) || defined(CONFIG_MINI2440)
 /* configuration for 2410 with 512byte sized flash */
 #define NAND_PAGE_SIZE		512
@@ -75,29 +83,32 @@ static inline void nand_wait(void)
 #if defined(CONFIG_S3C2410) && (NAND_PAGE_SIZE != 512)
 #error "S3C2410 does not support nand page size != 512"
 #endif
+#endif
 
-static int is_bad_block(unsigned long i)
+static int is_bad_block(struct boot_nand_t * nand, unsigned long i)
 {
 	unsigned char data;
 	unsigned long page_num;
 
 	nand_clear_RnB();
-#if (NAND_PAGE_SIZE == 512)
-	NFCMD = NAND_CMD_READOOB; /* 0x50 */
-	NFADDR = BAD_BLOCK_OFFSET & 0xf;
-	NFADDR = (i >> 9) & 0xff;
-	NFADDR = (i >> 17) & 0xff;
-	NFADDR = (i >> 25) & 0xff;
-#elif (NAND_PAGE_SIZE == 2048)
-	page_num = i >> 11; /* addr / 2048 */
-	NFCMD = NAND_CMD_READ0;
-	NFADDR = BAD_BLOCK_OFFSET & 0xff;
-	NFADDR = (BAD_BLOCK_OFFSET >> 8) & 0xff;
-	NFADDR = page_num & 0xff;
-	NFADDR = (page_num >> 8) & 0xff;
-	NFADDR = (page_num >> 16) & 0xff;
-	NFCMD = NAND_CMD_READSTART;
-#endif
+	if (nand->page_size == 512) {
+		NFCMD = NAND_CMD_READOOB; /* 0x50 */
+		NFADDR = nand->bad_block_offset & 0xf;
+		NFADDR = (i >> 9) & 0xff;
+		NFADDR = (i >> 17) & 0xff;
+		NFADDR = (i >> 25) & 0xff;
+	} else if (nand->page_size == 2048) {
+		page_num = i >> 11; /* addr / 2048 */
+		NFCMD = NAND_CMD_READ0;
+		NFADDR = nand->bad_block_offset & 0xff;
+		NFADDR = (nand->bad_block_offset >> 8) & 0xff;
+		NFADDR = page_num & 0xff;
+		NFADDR = (page_num >> 8) & 0xff;
+		NFADDR = (page_num >> 16) & 0xff;
+		NFCMD = NAND_CMD_READSTART;
+	} else {
+		return -1;
+	}
 	nand_wait();
 	data = (NFDATA & 0xff);
 	if (data != 0xff)
@@ -106,7 +117,7 @@ static int is_bad_block(unsigned long i)
 	return 0;
 }
 
-static int nand_read_page_ll(unsigned char *buf, unsigned long addr)
+static int nand_read_page_ll(struct boot_nand_t * nand, unsigned char *buf, unsigned long addr)
 {
 	unsigned short *ptr16 = (unsigned short *)buf;
 	unsigned int i, page_num;
@@ -115,67 +126,101 @@ static int nand_read_page_ll(unsigned char *buf, unsigned long addr)
 
 	NFCMD = NAND_CMD_READ0;
 
-#if (NAND_PAGE_SIZE == 512)
-	/* Write Address */
-	NFADDR = addr & 0xff;
-	NFADDR = (addr >> 9) & 0xff;
-	NFADDR = (addr >> 17) & 0xff;
-	NFADDR = (addr >> 25) & 0xff;
-#elif (NAND_PAGE_SIZE == 2048)
-	page_num = addr >> 11; /* addr / 2048 */
-	/* Write Address */
-	NFADDR = 0;
-	NFADDR = 0;
-	NFADDR = page_num & 0xff;
-	NFADDR = (page_num >> 8) & 0xff;
-	NFADDR = (page_num >> 16) & 0xff;
-	NFCMD = NAND_CMD_READSTART;
-#else
-#error "unsupported nand page size"
-#endif
+	if (nand->page_size == 512) {
+		/* Write Address */
+		NFADDR = addr & 0xff;
+		NFADDR = (addr >> 9) & 0xff;
+		NFADDR = (addr >> 17) & 0xff;
+		NFADDR = (addr >> 25) & 0xff;
+	} else if (nand->page_size == 2048) {
+		page_num = addr >> 11; /* addr / 2048 */
+		/* Write Address */
+		NFADDR = 0;
+		NFADDR = 0;
+		NFADDR = page_num & 0xff;
+		NFADDR = (page_num >> 8) & 0xff;
+		NFADDR = (page_num >> 16) & 0xff;
+		NFCMD = NAND_CMD_READSTART;
+	} else {
+		return -1;
+	}
 	nand_wait();
 
 #if defined(CONFIG_S3C2410)
-	for (i = 0; i < NAND_PAGE_SIZE; i++) {
+	for (i = 0; i < nand->page_size; i++) {
 		*buf = (NFDATA & 0xff);
 		buf++;
 	}
 #elif defined(CONFIG_S3C2440) || defined(CONFIG_S3C2442)
-	for (i = 0; i < NAND_PAGE_SIZE/2; i++) {
+	for (i = 0; i < (nand->page_size>>1); i++) {
 		*ptr16 = NFDATA16;
 		ptr16++;
 	}
 #endif
 
-	return NAND_PAGE_SIZE;
+	return nand->page_size;
 }
+
+static unsigned short nand_read_id()
+{
+	unsigned short res = 0;
+	NFCMD = NAND_CMD_READID;
+	NFADDR = 0;
+	res = NFDATA;
+	res = (res << 8) | NFDATA;
+	return res;
+}
+
+extern unsigned int dynpart_size[];
 
 /* low level nand read function */
 int nand_read_ll(unsigned char *buf, unsigned long start_addr, int size)
 {
 	int i, j;
-
-	if ((start_addr & NAND_BLOCK_MASK) || (size & NAND_BLOCK_MASK))
-		return -1;	/* invalid alignment */
+	unsigned short nand_id;
+	struct boot_nand_t nand;
 
 	/* chip Enable */
 	nand_select();
 	nand_clear_RnB();
-	for (i=0; i<10; i++);
+	
+	for (i = 0; i < 10; i++)
+		;
+	nand_id = nand_read_id();
+	if (0) { /* dirty little hack to detect if nand id is misread */
+		unsigned short * nid = (unsigned short *)0x31fffff0;
+		*nid = nand_id;
+	}	
+
+	if (nand_id == 0xec76) {	/* Samsung K91208 */
+		nand.page_size = 512;
+		nand.block_size = 16 * 1024;
+		nand.bad_block_offset = 5;
+		nand.size = 0x4000000;
+	} else if (nand_id == 0xecf1) { /* Samsung K9F1G08U0B */
+		nand.page_size = 2048;
+		nand.block_size = 128 * 1024;
+		nand.bad_block_offset = nand.page_size;
+		nand.size = 0x8000000;
+	} else {
+		return -1; // hang
+	}
+	if ((start_addr & (nand.block_size-1)) || (size & ((nand.block_size-1))))
+		return -1;	/* invalid alignment */
 
 	for (i=start_addr; i < (start_addr + size);) {
 #ifdef CONFIG_S3C2410_NAND_SKIP_BAD
-		if (i % NAND_BLOCK_SIZE == 0) {
-			if (is_bad_block(i) ||
-			    is_bad_block(i + NAND_PAGE_SIZE)) {
+		if (i % nand.block_size == 0) {
+			if (is_bad_block(&nand, i) ||
+			    is_bad_block(&nand, i + nand.page_size)) {
 				/* Bad block */
-				i += NAND_BLOCK_SIZE;
-				size += NAND_BLOCK_SIZE;
+				i += nand.block_size;
+				size += nand.block_size;
 				continue;
 			}
 		}
 #endif
-		j = nand_read_page_ll(buf, i);
+		j = nand_read_page_ll(&nand, buf, i);
 		i += j;
 		buf += j;
 	}
