@@ -210,7 +210,7 @@ int nand_read_ll(unsigned char *buf, unsigned long start_addr, int size)
 
 	for (i=start_addr; i < (start_addr + size);) {
 #ifdef CONFIG_S3C2410_NAND_SKIP_BAD
-		if (i % nand.block_size == 0) {
+		if (i & (nand.block_size-1)== 0) {
 			if (is_bad_block(&nand, i) ||
 			    is_bad_block(&nand, i + nand.page_size)) {
 				/* Bad block */
