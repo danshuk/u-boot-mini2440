@@ -23,6 +23,7 @@
 #define MMC_CMD_ALL_SEND_CID 		2
 #define MMC_CMD_SET_RCA			3
 #define MMC_CMD_SELECT_CARD		7
+#define MMC_CMD_IF_COND                 8
 #define MMC_CMD_SEND_CSD 		9
 #define MMC_CMD_SEND_CID 		10
 #define MMC_CMD_SEND_STATUS		13

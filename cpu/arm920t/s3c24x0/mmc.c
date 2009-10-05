@@ -33,6 +33,12 @@
 
 #if defined(CONFIG_MMC) && defined(CONFIG_MMC_S3C)
 
+#ifdef DEBUG
+#define pr_debug(fmt, args...) printf(fmt, ##args)
+#else
+#define pr_debug(...) do { } while(0)
+#endif
+
 #define CONFIG_MMC_WIDE
 
 static S3C2410_SDI *sdi;
@@ -56,6 +62,8 @@ static int wide = 0;
 
 #define CMD_F_RESP	0x01
 #define CMD_F_RESP_LONG	0x02
+
+#define CMD_F_RESP_R7 CMD_F_RESP
 
 static u_int32_t *mmc_cmd(ushort cmd, ulong arg, ushort flags)
 {
@@ -143,7 +151,7 @@ static int mmc_block_read(uchar *dst, ulong src, ulong len)
 	sdi->SDIDCON = dcon;
 
 	/* send read command */
-	resp = mmc_cmd(MMC_CMD_READ_BLOCK, src, CMD_F_RESP);
+	resp = mmc_cmd(MMC_CMD_READ_BLOCK, (mmc_dev.if_type == IF_TYPE_SDHC) ? (src >> 9) : src, CMD_F_RESP);
 
 	while (len > 0) {
 		u_int32_t sdidsta = sdi->SDIDSTA;
@@ -390,6 +398,7 @@ int mmc_init(int verbose)
 	int is_sd = 0;
 	u_int32_t *resp;
 	S3C24X0_CLOCK_POWER * const clk_power = S3C24X0_GetBase_CLOCK_POWER();
+	block_dev_desc_t *mmc_blkdev_p = &mmc_dev;
 
 	sdi = S3C2410_GetBase_SDI();
 
@@ -417,11 +426,49 @@ int mmc_init(int verbose)
 	retries = 10;
 	resp = mmc_cmd(MMC_CMD_RESET, 0, 0);
 
+	mmc_dev.if_type = IF_TYPE_UNKNOWN;
+	if(verbose)
+		puts("mmc: Probing for SDHC ...\n");
+
+	/* Send supported voltage range */
+	/* SD cards 1.x do not answer to CMD8 */
+        resp = mmc_cmd(MMC_CMD_IF_COND, ((1 << 8) | 0xAA), CMD_F_RESP_R7);
+        if (!resp[0]) {
+             /*
+              * ARC: No answer let's try SD 1.x
+              */
+             if(verbose)
+                     puts("mmc: No answer to CMD8 trying SD\n");
+             mmc_blkdev_p->if_type = IF_TYPE_SD;
+        } else {
+             /*
+              * ARC: probably an SDHC card
+              */
+             mmc_blkdev_p->if_type = IF_TYPE_SDHC;
+             if(verbose)
+                     puts("mmc: SD 2.0 or later card found\n");
+
+             /* Check if the card supports this voltage */
+             if (resp[0] != ((1 << 8) | 0xAA)) {
+                     pr_debug("mmc: Invalid voltage range\n");
+                     return -ENODEV;
+             }
+        }
+
+	/*
+	 * ARC: HC (30) bit set according to response to
+	 * CMD8 command
+	 */
+
+	pr_debug("mmc: Sending ACMD41 %s HC set\n",
+		         ((mmc_blkdev_p->if_type ==
+		           IF_TYPE_SDHC) ? "with" : "without"));
+
 	printf("trying to detect SD Card...\n");
 	while (retries--) {
 		udelay(100000);
 		resp = mmc_cmd(55, 0x00000000, CMD_F_RESP);
-		resp = mmc_cmd(41, 0x00300000, CMD_F_RESP);
+		resp = mmc_cmd(41, (mmc_blkdev_p->if_type == IF_TYPE_SDHC)? (0x00300000 | (1<<30)) : 0x00300000, CMD_F_RESP);
 
 		if (resp[0] & (1 << 31)) {
 			is_sd = 1;
@@ -429,9 +476,18 @@ int mmc_init(int verbose)
 		}
 	}
 
+	/*
+	* ARC: check for HC bit, if its not set
+	* sd card is SD
+	*/
+	if (is_sd && (resp[0] & 0xc0000000) == 0x80000000) {
+	       mmc_dev.if_type = IF_TYPE_SD;
+	}
+
 	if (retries == 0 && !is_sd) {
 		retries = 10;
 		printf("failed to detect SD Card, trying MMC\n");
+		mmc_blkdev_p->if_type = IF_TYPE_MMC;
 		resp = mmc_cmd(MMC_CMD_SEND_OP_COND, 0x00ffc000, CMD_F_RESP);
 		while (retries-- && resp && !(resp[4] & 0x80)) {
 			debug("resp %x %x\n", resp[0], resp[1]);
@@ -476,7 +532,8 @@ int mmc_init(int verbose)
 		}
 
 		/* fill in device description */
-		mmc_dev.if_type = IF_TYPE_MMC;
+		if (mmc_dev.if_type == IF_TYPE_UNKNOWN)
+			mmc_dev.if_type = IF_TYPE_MMC;
 		mmc_dev.part_type = PART_TYPE_DOS;
 		mmc_dev.dev = 0;
 		mmc_dev.lun = 0;
@@ -506,6 +563,10 @@ int mmc_init(int verbose)
 	}
 
 	resp = mmc_cmd(MMC_CMD_SELECT_CARD, rca<<16, CMD_F_RESP);
+
+	if (verbose)
+	       printf("SD Card detected RCA: 0x%x type: %s\n",
+	              rca, ((mmc_dev.if_type == IF_TYPE_SDHC) ? "SDHC" : ((mmc_dev.if_type == IF_TYPE_SD) ? "SD" : "MMC")));
 
 #ifdef CONFIG_MMC_WIDE
 	if (is_sd) {
