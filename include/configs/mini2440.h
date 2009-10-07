@@ -32,20 +32,11 @@
 #ifndef __CONFIG_H
 #define __CONFIG_H
 
-//#include <common.h>
-//#include <s3c2440.h>
-
-#if 0
-/* If we want to start u-boot from usb bootloader in NOR flash */
-#define CONFIG_SKIP_RELOCATE_UBOOT	1
-#define	CONFIG_SKIP_LOWLEVEL_INIT	1
-#else
 /* If we want to start u-boot directly from within NAND flash
  * Also use this if loading the bootloader directly via JTAG */
 #define CONFIG_LL_INIT_NAND_ONLY
 #define CONFIG_S3C2410_NAND_BOOT	1
 #define CONFIG_S3C2410_NAND_SKIP_BAD	1
-#endif
 
 #define CFG_UBOOT_SIZE		0x40000 /* size of u-boot, for NAND loading */
 
@@ -64,8 +55,7 @@
 
 
 #define USE_920T_MMU		1
-//#define CONFIG_USE_IRQ		1
-#undef CONFIG_USE_IRQ			/* we don't need IRQ/FIQ stuff */
+#define CONFIG_USE_IRQ		1	/* Needed for USB device! */
 
 /*
  * Size of malloc() pool
@@ -76,11 +66,11 @@
 /*
  * Hardware drivers
  */
-#define CONFIG_DRIVER_DM9000 1
-#define CONFIG_DRIVER_DM9000_NO_EEPROM 1
-#define CONFIG_DM9000_BASE 0x20000300
-#define DM9000_IO CONFIG_DM9000_BASE
-#define DM9000_DATA (CONFIG_DM9000_BASE+4)
+#define CONFIG_DRIVER_DM9000		1
+#define CONFIG_DRIVER_DM9000_NO_EEPROM	1
+#define CONFIG_DM9000_BASE 		0x20000300
+#define DM9000_IO 			CONFIG_DM9000_BASE
+#define DM9000_DATA			(CONFIG_DM9000_BASE+4)
 
 #define CONFIG_DRIVER_S3C24X0_I2C	1
 #if (CONFIG_DRIVER_S3C24X0_I2C)
@@ -178,7 +168,7 @@
  *
  * The stack sizes are set up in start.S using the settings below
  */
-#define CONFIG_STACKSIZE	(512*1024)	/* regular stack */
+#define CONFIG_STACKSIZE	(128*1024)	/* regular stack */
 #ifdef CONFIG_USE_IRQ
 #define CONFIG_STACKSIZE_IRQ	(8*1024)	/* IRQ stack */
 #define CONFIG_STACKSIZE_FIQ	(4*1024)	/* FIQ stack */
@@ -192,10 +182,12 @@
 #define CFG_USB_OHCI_REGS_BASE	0x49000000 /* S3C24X0_USB_HOST_BASE */
 #define CFG_USB_OHCI_SLOT_NAME	"s3c2440"
 #define CFG_USB_OHCI_MAX_ROOT_PORTS 	2
+#endif
 
+#if 1
 #define CONFIG_USB_DEVICE	1
-#define CONFIG_USB_TTY		0
-#define CONFIG_USB_STORAGE	0
+#define CONFIG_USB_TTY		1
+#define CONFIG_USB_STORAGE	1
 #define CFG_CONSOLE_IS_IN_ENV	1
 #define CONFIG_USBD_VENDORID		0x1457	/* FIC */
 #define CONFIG_USBD_PRODUCTID_GSERIAL	0x5120	/* gserial */
