@@ -192,7 +192,8 @@ int nand_read_ll(unsigned char *buf, unsigned long start_addr, int size)
 		*nid = nand_id;
 	}	
 
-	if (nand_id == 0xec76) {	/* Samsung K91208 */
+	if (nand_id == 0xec76 || /* Samsung K91208 */
+	    nand_id == 0xad76 /*Hynix HY27US08121A*/ ) {	
 		nand.page_size = 512;
 		nand.block_size = 16 * 1024;
 		nand.bad_block_offset = 5;

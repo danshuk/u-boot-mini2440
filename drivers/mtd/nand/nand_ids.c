@@ -57,6 +57,7 @@ struct nand_flash_dev nand_flash_ids[] = {
 
 	{"NAND 64MiB 1,8V 8-bit", 	0x36, 512, 64, 0x4000, 0},
 	{"NAND 64MiB 3,3V 8-bit", 	0x76, 512, 64, 0x4000, 0},
+	{"NAND 64MiB 3,3V 8-bit",       0xAD, 512, 64, 0x4000, 0},
 	{"NAND 64MiB 1,8V 16-bit", 	0x46, 512, 64, 0x4000, NAND_BUSWIDTH_16},
 	{"NAND 64MiB 3,3V 16-bit", 	0x56, 512, 64, 0x4000, NAND_BUSWIDTH_16},
 
@@ -124,6 +125,7 @@ struct nand_manufacturers nand_manuf_ids[] = {
 	{NAND_MFR_RENESAS, "Renesas"},
 	{NAND_MFR_STMICRO, "ST Micro"},
 	{NAND_MFR_MICRON, "Micron"},
+	{NAND_MFR_HYNIX,  "Hynix"},
 	{0x0, "Unknown"}
 };
 #endif

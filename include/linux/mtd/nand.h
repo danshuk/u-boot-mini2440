@@ -350,6 +350,7 @@ struct nand_chip {
 #define NAND_MFR_RENESAS	0x07
 #define NAND_MFR_STMICRO	0x20
 #define NAND_MFR_MICRON		0x2c
+#define NAND_MFR_HYNIX          0xad
 
 /**
  * struct nand_flash_dev - NAND Flash Device ID Structure
