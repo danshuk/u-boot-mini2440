@@ -111,23 +111,22 @@
 #define B5_Tacp		 	0x0
 #define B5_PMC		 	0x0	/* normal */
 
-#define B6_MT		 	0x3	/* SDRAM */
-#define B6_Trcd	 	 	0x1
-#define B6_SCAN		 	0x1	/* 9bit */
+#define SDRAM_MT	 	0x3	/* SDRAM */
+#define SDRAM_Trcd	 	0x0	/* 2clk */
+#define SDRAM_SCAN_9	 	0x1	/* 9bit */
+#define SDRAM_SCAN_10	 	0x2	/* 10bit */
 
-#define B7_MT		 	0x3	/* SDRAM */
-#define B7_Trcd		 	0x1	/* 3clk */
-#define B7_SCAN		 	0x1	/* 9bit */
+#define SDRAM_128MB	((SDRAM_MT<<15)+(SDRAM_Trcd<<2)+(SDRAM_SCAN_10))	
+#define SDRAM_64MB	((SDRAM_MT<<15)+(SDRAM_Trcd<<2)+(SDRAM_SCAN_9))	
 
 /* REFRESH parameter */
 #define REFEN		 	0x1	/* Refresh enable */
 #define TREFMD		 	0x0	/* CBR(CAS before RAS)/Auto refresh */
-#define Trp		 		0x1	/* 3clk */
-#define Trc		 		0x3	/* 7clk */
+#define Trp		 	0x1	/* 3clk */
+#define Trc		 	0x3	/* 7clk */
 #define Tchr		 	0x0	/* unused */
 
-// REFRESH counter =  1049 (uboot 10us hclk 101 Mhz / 100Mhz SDRAM)
-#define REFCNT		 	1049	/* period=10us, HCLK=100Mhz, (2048+1-7.8*100) */
+#define REFCNT		 	1012	/* period=10.37us, HCLK=100Mhz, (2048+1-10.37*100) */
 
 /**************************************/
 
@@ -159,6 +158,22 @@ lowlevel_init:
 	cmp     r2, r0
 	bne     0b
 
+	/*
+	   SDRAM comfigured for 128MB, lets try if it works, otherwise,
+	   restart it with the smaller scan lines for 64MB
+	 */
+	ldr 	r1, =0x34000000		/* just outside 64MB RAM space */
+	ldr	r0, =0xdeadbeef
+	str	r0, [r1]
+	ldr	r2, [r1]
+	cmp	r2, r1
+	beq	return	
+
+	ldr	r1, =BWSCON+(7*4)
+	ldr	r0, =SDRAM_64MB
+	str	r0, [r1], #4
+	str	r0, [r1]
+return:
 	/* everything is fine now */
 	mov	pc, lr
 
@@ -173,9 +188,9 @@ SMRDATA:
     .word ((B3_Tacs<<13)+(B3_Tcos<<11)+(B3_Tacc<<8)+(B3_Tcoh<<6)+(B3_Tah<<4)+(B3_Tacp<<2)+(B3_PMC))
     .word ((B4_Tacs<<13)+(B4_Tcos<<11)+(B4_Tacc<<8)+(B4_Tcoh<<6)+(B4_Tah<<4)+(B4_Tacp<<2)+(B4_PMC))
     .word ((B5_Tacs<<13)+(B5_Tcos<<11)+(B5_Tacc<<8)+(B5_Tcoh<<6)+(B5_Tah<<4)+(B5_Tacp<<2)+(B5_PMC))
-    .word ((B6_MT<<15)+(B6_Trcd<<2)+(B6_SCAN))
-    .word ((B7_MT<<15)+(B7_Trcd<<2)+(B7_SCAN))
+    .word SDRAM_128MB
+    .word SDRAM_128MB
     .word ((REFEN<<23)+(TREFMD<<22)+(Trp<<20)+(Trc<<18)+(Tchr<<16)+REFCNT)
-    .word 0x32
+    .word 0xb2 /* enable burst */
     .word 0x30
     .word 0x30

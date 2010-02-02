@@ -78,7 +78,7 @@ int board_init (void)
 	// port B outputs reconfigured
 	gpio->GPBCON = 	
 		(0x1 <<  0) | // GPB0	OUT	TOUT0		PWM Buzzer
-		(0x2 <<  2) | // GPB1	OUT	TOUT1		LCD Backlight ?
+		(0x2 <<  2) | // GPB1	OUT	TOUT1		LCD Backlight
 		(0x1 <<  4) | // GPB2	OUT	L3MODE
 		(0x1 <<  6) | // GBP3	OUT	L3DATA
 		(0x1 <<  8) | // GBP4	OUT	L3CLOCK
@@ -131,7 +131,7 @@ int board_init (void)
 		(0x1 <<  2) | // GPG1	EINT9	OUT		Con5
 		(0x1 <<  4) | // GPG2	EINT10	OUT
 		(0x0 <<  6) | // GPG3	EINT11	IN	Key2
-		(0x1 <<  8) | // GPG4	EINT12	OUT
+		(0x0 <<  8) | // GPG4	EINT12	IN	Smart Screen Interrupt
 		(0x0 << 10) | // GPG5	EINT13	IN	Key3
 		(0x0 << 12) | // GPG6	EINT14	IN	Key4
 		(0x0 << 14) | // GPG7	EINT15	IN	Key5
@@ -243,8 +243,13 @@ void board_video_init(GraphicDevice *pGD)
 
 int dram_init (void)
 {
+	S3C24X0_MEMCTL * const mem = S3C24X0_GetBase_MEMCTL();
 	gd->bd->bi_dram[0].start = PHYS_SDRAM_1;
-	gd->bd->bi_dram[0].size = PHYS_SDRAM_1_SIZE;
+	/* if the early bootloader found 128MB, lets tell the kernel */
+	if ((mem->BANKCON[6] & 0x3) == 0x2)
+		gd->bd->bi_dram[0].size = 128*1024*1024;
+	else
+		gd->bd->bi_dram[0].size = 64*1024*1024;
 
 	return 0;
 }
