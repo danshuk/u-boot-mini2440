@@ -60,7 +60,7 @@ struct boot_nand_t {
 	int page_size;
 	int block_size;
 	int bad_block_offset;
-	unsigned long size;
+	int small_address;
 };
 
 #if 0
@@ -96,7 +96,8 @@ static int is_bad_block(struct boot_nand_t * nand, unsigned long i)
 		NFADDR = nand->bad_block_offset & 0xf;
 		NFADDR = (i >> 9) & 0xff;
 		NFADDR = (i >> 17) & 0xff;
-		NFADDR = (i >> 25) & 0xff;
+		if (!nand->small_address)
+			NFADDR = (i >> 25) & 0xff;
 	} else if (nand->page_size == 2048) {
 		page_num = i >> 11; /* addr / 2048 */
 		NFCMD = NAND_CMD_READ0;
@@ -131,7 +132,8 @@ static int nand_read_page_ll(struct boot_nand_t * nand, unsigned char *buf, unsi
 		NFADDR = addr & 0xff;
 		NFADDR = (addr >> 9) & 0xff;
 		NFADDR = (addr >> 17) & 0xff;
-		NFADDR = (addr >> 25) & 0xff;
+		if (!nand->small_address)
+			NFADDR = (addr >> 25) & 0xff;
 	} else if (nand->page_size == 2048) {
 		page_num = addr >> 11; /* addr / 2048 */
 		/* Write Address */
@@ -192,19 +194,23 @@ int nand_read_ll(unsigned char *buf, unsigned long start_addr, int size)
 		*nid = nand_id;
 	}	
 
-	if (nand_id == 0xec76 || /* Samsung K91208 */
-	    nand_id == 0xad76 /*Hynix HY27US08121A*/ ) {	
+	if (nand_id == 0xec75 /* Samsung K90608 */ ) {
 		nand.page_size = 512;
 		nand.block_size = 16 * 1024;
 		nand.bad_block_offset = 5;
-		nand.size = 0x4000000;
-	} else if (nand_id == 0xecf1) { /* Samsung K9F1G08U0B */
+		/* 32MiB nand only uses 3 bytes addresses */
+		nand.small_address = 1;
+	} else if (
+	    nand_id == 0xec76 || /* Samsung K91208 */ 
+	    nand_id == 0xad76 /* Hynix HY27US08121A */ ) {	
+		nand.page_size = 512;
+		nand.block_size = 16 * 1024;
+		nand.bad_block_offset = 5;
+		nand.small_address = 0;
+	} else  { /* Any other new Nand, like Samsung K9F1G08U0B */
 		nand.page_size = 2048;
 		nand.block_size = 128 * 1024;
 		nand.bad_block_offset = nand.page_size;
-		nand.size = 0x8000000;
-	} else {
-		return -1; // hang
 	}
 	if ((start_addr & (nand.block_size-1)) || (size & ((nand.block_size-1))))
 		return -1;	/* invalid alignment */
