@@ -452,6 +452,13 @@ int flash_sect_erase (ulong addr_first, ulong addr_last)
 }
 #endif /* CFG_NO_FLASH */
 
+int do_flinit (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
+{
+#ifndef CFG_NO_FLASH
+	flash_init();
+#endif
+}
+
 int do_protect (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
 {
 #ifndef CFG_NO_FLASH
@@ -698,6 +705,11 @@ int flash_sect_protect (int p, ulong addr_first, ulong addr_last)
 # define TMP_PROT_ON	/* empty */
 # define TMP_PROT_OFF	/* empty */
 #endif
+
+U_BOOT_CMD(
+	flinit,    1,    1,    do_flinit,
+	"flinit  - Initialize/probe NOR flash memory\n",
+);
 
 U_BOOT_CMD(
 	flinfo,    2,    1,    do_flinfo,
