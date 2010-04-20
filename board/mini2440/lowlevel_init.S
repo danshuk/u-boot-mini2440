@@ -162,13 +162,14 @@ lowlevel_init:
 	   SDRAM comfigured for 128MB, lets try if it works, otherwise,
 	   restart it with the smaller scan lines for 64MB
 	 */
+#if 0
 	ldr 	r1, =0x34000000		/* just outside 64MB RAM space */
 	ldr	r0, =0xdeadbeef
 	str	r0, [r1]
 	ldr	r2, [r1]
-	cmp	r2, r1
+	cmp	r2, r0
 	beq	return	
-
+#endif
 	ldr	r1, =BWSCON+(7*4)
 	ldr	r0, =SDRAM_64MB
 	str	r0, [r1], #4
