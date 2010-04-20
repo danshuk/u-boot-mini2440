@@ -25,12 +25,12 @@ include $(TOPDIR)/config.mk
 
 LIB	= $(obj)lib$(BOARD).a
 
-COBJS	:= mini2440.o flash.o udc.o
+COBJS	:= mini2440.o udc.o mega.o
 SOBJS	:= lowlevel_init.o
 
 .PHONY:	all
 
-all:	$(LIB)
+all:	$(LIB) lowlevel_foo.bin
 
 SRCS	:= $(SOBJS:.o=.S) $(COBJS:.o=.c)
 OBJS	:= $(addprefix $(obj),$(COBJS))
@@ -40,7 +40,7 @@ $(LIB):	$(obj).depend $(OBJS) $(SOBJS)
 	$(AR) $(ARFLAGS) $@ $(OBJS) $(SOBJS)
 
 lowlevel_foo.o:	lowlevel_foo.S
-	$(CC) -c -DTEXT_BASE=0x33F80000 -march=armv4 \
+	$(CC) $(CFLAGS) -c -DTEXT_BASE=0x33F80000 -march=armv4 \
 	  -o lowlevel_foo.o lowlevel_foo.S
 
 lowlevel_foo:	lowlevel_foo.o lowlevel_init.o lowlevel_foo.lds
