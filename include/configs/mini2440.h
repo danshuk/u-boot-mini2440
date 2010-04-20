@@ -5,7 +5,7 @@
  * Gary Jennejohn <gj@denx.de>
  * David Mueller <d.mueller@elsoft.ch>
  *
- * (C) Copyright 2009
+ * (C) Copyright 2009-2010
  * Michel Pollet <buserror@gmail.com>
  * 
  * Configuation settings for the MINI2440 board.
@@ -33,8 +33,11 @@
 #define __CONFIG_H
 
 /* If we want to start u-boot directly from within NAND flash
- * Also use this if loading the bootloader directly via JTAG */
-#define CONFIG_LL_INIT_NAND_ONLY
+ * Also use this if loading the bootloader directly via JTAG
+ * Mote that this is incompatible with NOR booting.
+ */
+//#define CONFIG_LL_INIT_NAND_ONLY	1
+
 #define CONFIG_S3C2410_NAND_BOOT	1
 #define CONFIG_S3C2410_NAND_SKIP_BAD	1
 
@@ -48,14 +51,22 @@
 #define	CONFIG_S3C2440		1	/* in a SAMSUNG S3C2440 SoC     */
 #define CONFIG_MINI2440		1	/* on a MIN2440 Board  */
 
-#define CONFIG_MINI2440_OVERCLOCK 1	/* use frequencies over 405Mhz */
+/*
+ * It is possible to have u-boot save it's environment in NOR, however,
+ * reember it is incompatible with booting from NAND as the NOR is not
+ * available at that point. So use this only if you use nand as storage
+ * and will never boot from it
+ */
+/* #define CONFIG_MINI2440_NOR_ENV		1 */
+
+#define CONFIG_MINI2440_OVERCLOCK 1	/* allow use of frequencies over 405Mhz */
 
 /* input clock of PLL */
 #define CONFIG_SYS_CLK_FREQ	12000000	/* MINI2440 has 12.0000MHz input clock */
 
 
 #define USE_920T_MMU		1
-#define CONFIG_USE_IRQ		1	/* Needed for USB device! */
+//#define CONFIG_USE_IRQ		1	/* Needed for USB device! */
 
 /*
  * Size of malloc() pool
@@ -77,6 +88,8 @@
 #define CONFIG_HARD_I2C			1
 #define CFG_I2C_SPEED			100000	/* 100kHz */
 #define CFG_I2C_SLAVE			0x7f
+
+#define CONFIG_MEGADISPLAY		1
 #endif
 
 /*
@@ -212,38 +225,39 @@
 
 #define PHYS_FLASH_1		0x00000000 /* Flash Bank #1 */
 
-#define CFG_FLASH_BASE		PHYS_FLASH_1
-
-/*-----------------------------------------------------------------------
- * FLASH and environment organization
+/*
+ * When booting from NAND, it is impossible to access the lowest addresses
+ * due to the SteppingStone being in the way. Luckily the NOR doesn't really
+ * care about the highest 16 bits of address, so we set the controlers
+ * registers to go and poke over there, instead.
  */
+#define CFG_FLASH_BASE		(0x0000 + PHYS_FLASH_1)
 
-#define CONFIG_SST_VF1601	1	/* uncomment this if you have a Am29LV160DB flash */
-
+/*
+ * NOR FLASH organization
+ * Now uses the standard CFI interface
+ */
+#define CFG_FLASH_CFI		1
+#define CFG_FLASH_CFI_DRIVER	1
+#define CFG_FLASH_CFI_WIDTH	FLASH_CFI_16BIT
+#define CFG_MONITOR_BASE	0x0
 #define CFG_MAX_FLASH_BANKS	1	/* max number of memory banks */
-
-#ifdef CONFIG_SST_VF1601
-#define PHYS_FLASH_SIZE		0x00200000 /* 2MB */
-#define CFG_MAX_FLASH_SECT	(32)	/* max number of sectors on one chip */
-#endif
-
-/* timeout values are in ticks */
-#define CFG_FLASH_ERASE_TOUT	(5*CFG_HZ) /* Timeout for Flash Erase */
-#define CFG_FLASH_WRITE_TOUT	(5*CFG_HZ) /* Timeout for Flash Write */
+#define CFG_MAX_FLASH_SECT	512	/* 512 * 4096 sectors, or 32 * 64k blocks */
+#define CONFIG_FLASH_SHOW_PROGRESS	1
 
 /*
  * u-boot environmnet
  */
-#if 1
+#ifndef CONFIG_MINI2440_NOR_ENV
 #define	CFG_ENV_IS_IN_NAND	1
 #define CFG_ENV_OFFSET_OOB	1	// dont define for CFG_ENV_IS_IN_FLASH
 /* This size must be the size of a common denominator for the NAND erase block */
 #define CFG_ENV_SIZE		0x20000		/* 128k Total Size of Environment Sector */
 #else
-#define CFG_ENV_IS_IN_FLASH 1
-#define CFG_MY_ENV_OFFSET 0X40000
-#define CFG_ENV_ADDR		(CFG_FLASH_BASE + CFG_MY_ENV_OFFSET) /* addr of environment */
-#define CFG_ENV_SIZE		0x10000		/* 64k Total Size of Environment Sector */
+#define CFG_ENV_IS_IN_FLASH 	1
+#define CFG_MY_ENV_OFFSET 	0X40000
+#define CFG_ENV_ADDR		(PHYS_FLASH_1 + CFG_MY_ENV_OFFSET) /* addr of environment */
+#define CFG_ENV_SIZE		0x4000		/* 16k Total Size of Environment Sector */
 #endif
 #define CFG_PREBOOT_OVERRIDE	1
 
@@ -260,14 +274,10 @@
 #define CONFIG_FAT		1
 #define CONFIG_SUPPORT_VFAT	1
 
-#if 1
 /* JFFS2 driver */
 #define CONFIG_JFFS2_CMDLINE	1
 #define CONFIG_JFFS2_NAND	1
 #define CONFIG_JFFS2_NAND_DEV	0
-//#define CONFIG_JFFS2_NAND_OFF		0x634000
-//#define CONFIG_JFFS2_NAND_SIZE	0x39cc000
-#endif
 
 /* ATAG configuration */
 #define CONFIG_INITRD_TAG		1
@@ -277,33 +287,8 @@
 #define CONFIG_REVISION_TAG		1
 #define CONFIG_SERIAL_TAG		1
 #endif
-#define CONFIG_CMDLINE_EDITING	1
-#define CONFIG_AUTO_COMPLETE	1
-
-
-#if 0
-#define CONFIG_CMD_BMP 
-#define CONFIG_VIDEO
-#define CONFIG_VIDEO_S3C2410
-#define CONFIG_VIDEO_LOGO
-#define CONFIG_CFB_CONSOLE
-//#define CFG_CONSOLE_IS_IN_ENV
-//#define CONFIG_CONSOLE_EXTRA_INFO
-#define CONFIG_VGA_AS_SINGLE_DEVICE
-
-#define VIDEO_FB_16BPP_PIXEL_SWAP 
-#define CONFIG_VIDEO_BMP_LOGO 
-#define CONFIG_SPLASH_SCREEN 
-#define CFG_VIDEO_LOGO_MAX_SIZE         (240*320+1024+100) /* 100 = slack */ 
-#define CONFIG_VIDEO_BMP_GZIP 
-#define CONFIG_CMD_UNZIP 
-
-#define VIDEO_KBD_INIT_FCT	0
-#define VIDEO_TSTC_FCT		serial_tstc
-#define VIDEO_GETC_FCT		serial_getc
-
-#define LCD_VIDEO_ADDR		0x33d00000
-#endif
+#define CONFIG_CMDLINE_EDITING		1
+#define CONFIG_AUTO_COMPLETE		1
 
 #define CONFIG_S3C2410_NAND_BBT		1	
 //#define CONFIG_S3C2440_NAND_HWECC	1	/* this works for generation, not verification */
