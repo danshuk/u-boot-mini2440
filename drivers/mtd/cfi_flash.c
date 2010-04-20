@@ -136,6 +136,7 @@
 #define CFI_CMDSET_MITSU_STANDARD	256
 #define CFI_CMDSET_MITSU_EXTENDED	257
 #define CFI_CMDSET_SST			258
+#define CFI_CMDSET_SST_NEW		0x701
 
 #ifdef CFG_FLASH_CFI_AMD_RESET /* needed for STM_ID_29W320DB on UC100 */
 # undef  FLASH_CMD_RESET
@@ -151,7 +152,15 @@ typedef union {
 
 #define NUM_ERASE_REGIONS	4 /* max. number of erase regions */
 
-static uint flash_offset_cfi[2] = { FLASH_OFFSET_CFI, FLASH_OFFSET_CFI_ALT };
+#if CONFIG_MINI2440
+/* no need to try the other offsets on the mini */
+static uint flash_offset_cfi[1] = { 0x5555 };
+#else
+static uint flash_offset_cfi[3] = { 
+	FLASH_OFFSET_CFI, 
+	FLASH_OFFSET_CFI_ALT,
+	0x5555 };
+#endif
 
 /* use CFG_MAX_FLASH_BANKS_DETECT if defined */
 #ifdef CFG_MAX_FLASH_BANKS_DETECT
@@ -611,6 +620,7 @@ static int flash_is_busy (flash_info_t * info, flash_sect_t sect)
 		break;
 	case CFI_CMDSET_AMD_STANDARD:
 	case CFI_CMDSET_AMD_EXTENDED:
+	case CFI_CMDSET_SST_NEW:
 #ifdef CONFIG_FLASH_CFI_LEGACY
 	case CFI_CMDSET_AMD_LEGACY:
 #endif
@@ -799,6 +809,7 @@ static int flash_write_cfiword (flash_info_t * info, ulong dest,
 		break;
 	case CFI_CMDSET_AMD_EXTENDED:
 	case CFI_CMDSET_AMD_STANDARD:
+	case CFI_CMDSET_SST_NEW:
 #ifdef CONFIG_FLASH_CFI_LEGACY
 	case CFI_CMDSET_AMD_LEGACY:
 #endif
@@ -958,6 +969,7 @@ static int flash_write_cfibuffer (flash_info_t * info, ulong dest, uchar * cp,
 
 	case CFI_CMDSET_AMD_STANDARD:
 	case CFI_CMDSET_AMD_EXTENDED:
+	case CFI_CMDSET_SST_NEW:
 		flash_unlock_seq(info,0);
 		flash_write_cmd (info, sector, 0, AMD_CMD_WRITE_TO_BUFFER);
 
@@ -1071,6 +1083,15 @@ int flash_erase (flash_info_t * info, int s_first, int s_last)
 				flash_write_cmd (info, sect, 0,
 						 AMD_CMD_ERASE_SECTOR);
 				break;
+			case CFI_CMDSET_SST_NEW:
+				flash_unlock_seq (info, 0);
+				flash_write_cmd (info, 0,
+						info->addr_unlock1,
+						AMD_CMD_ERASE_START);
+				flash_unlock_seq (info, 0);
+				flash_write_cmd (info, sect, 0,
+						 AMD_CMD_ERASE_SECTOR);
+				break;
 #ifdef CONFIG_FLASH_CFI_LEGACY
 			case CFI_CMDSET_AMD_LEGACY:
 				flash_unlock_seq (info, 0);
@@ -1096,6 +1117,29 @@ int flash_erase (flash_info_t * info, int s_first, int s_last)
 	}
 	puts (" done\n");
 	return rcode;
+}
+
+static int _flash_is_sector_erased(flash_info_t * info, int i)
+{
+	int k;
+	int size;
+	int erased;
+	volatile unsigned long *flash;
+
+	/*
+	 * Check if whole sector is erased
+	 */
+	size = flash_sector_size(info, i);
+	erased = 1;
+	flash = (volatile unsigned long *) info->start[i];
+	size = size >> 2;	/* divide by 4 for longword access */
+	for (k = 0; k < size; k++) {
+		if (*flash++ != 0xffffffff) {
+			erased = 0;
+			break;
+		}
+	}
+	return erased;
 }
 
 /*-----------------------------------------------------------------------
@@ -1132,6 +1176,9 @@ void flash_print_info (flash_info_t * info)
 		case CFI_CMDSET_AMD_EXTENDED:
 			printf ("AMD Extended");
 			break;
+		case CFI_CMDSET_SST_NEW:
+			printf ("SST New");
+			break;	
 #ifdef CONFIG_FLASH_CFI_LEGACY
 		case CFI_CMDSET_AMD_LEGACY:
 			printf ("AMD Legacy");
@@ -1156,42 +1203,39 @@ void flash_print_info (flash_info_t * info)
 		info->buffer_size);
 	}
 
-	puts ("\n  Sector Start Addresses:");
-	for (i = 0; i < info->sector_count; ++i) {
-		if ((i % 5) == 0)
-			printf ("\n");
-#ifdef CFG_FLASH_EMPTY_INFO
-		int k;
-		int size;
-		int erased;
-		volatile unsigned long *flash;
-
-		/*
-		 * Check if whole sector is erased
-		 */
-		size = flash_sector_size(info, i);
-		erased = 1;
-		flash = (volatile unsigned long *) info->start[i];
-		size = size >> 2;	/* divide by 4 for longword access */
-		for (k = 0; k < size; k++) {
-			if (*flash++ != 0xffffffff) {
-				erased = 0;
-				break;
-			}
+	if (info->sector_count <= 64) {
+		puts ("\n  Sector Start Addresses:");
+		for (i = 0; i < info->sector_count; ++i) {
+			if ((i % 5) == 0)
+				printf ("\n");
+	#ifdef CFG_FLASH_EMPTY_INFO
+			is_erased(
+			/* print empty and read-only info */
+			printf ("  %08lX %c %s ",
+				info->start[i],
+				_flash_is_sector_erased(info, i) ? 'E' : ' ',
+				info->protect[i] ? "RO" : "  ");
+	#else	/* ! CFG_FLASH_EMPTY_INFO */
+			printf ("  %08lX   %s ",
+				info->start[i],
+				info->protect[i] ? "RO" : "  ");
+	#endif
 		}
-
-		/* print empty and read-only info */
-		printf ("  %08lX %c %s ",
-			info->start[i],
-			erased ? 'E' : ' ',
-			info->protect[i] ? "RO" : "  ");
-#else	/* ! CFG_FLASH_EMPTY_INFO */
-		printf ("  %08lX   %s ",
-			info->start[i],
-			info->protect[i] ? "RO" : "  ");
-#endif
+		putc ('\n');
+	} else {
+		puts ("\n  Sector Start Addresses:\n");
+		for (i = 0; i < info->sector_count; ++i) {
+			if ((i % 16) == 0)
+				printf (" %08x: ", info->start[i]);
+			printf ("%s",
+				_flash_is_sector_erased(info, i) ?
+					info->protect[i] ? "E" : "e" :
+					info->protect[i] ? "*" : "." );
+			if ((i % 32) == 31)
+				putc ('\n');
+		}
+		putc ('\n');
 	}
-	putc ('\n');
 	return;
 }
 
@@ -1516,6 +1560,7 @@ static void flash_read_jedec_ids (flash_info_t * info)
 		break;
 	case CFI_CMDSET_AMD_STANDARD:
 	case CFI_CMDSET_AMD_EXTENDED:
+	case CFI_CMDSET_SST_NEW:
 		cmdset_amd_read_jedec_ids(info);
 		break;
 	default:
@@ -1570,6 +1615,7 @@ static int flash_detect_legacy(ulong base, int banknum)
 			break;
 		case CFI_CMDSET_AMD_STANDARD:
 		case CFI_CMDSET_AMD_EXTENDED:
+		case CFI_CMDSET_SST_NEW:
 		case CFI_CMDSET_AMD_LEGACY:
 			info->cmd_reset = AMD_CMD_RESET;
 			break;
@@ -1603,12 +1649,6 @@ static void flash_read_cfi (flash_info_t *info, void *buf,
 static int __flash_detect_cfi (flash_info_t * info, struct cfi_qry *qry)
 {
 	int cfi_offset;
-
-	/* We do not yet know what kind of commandset to use, so we issue
-	   the reset command in both Intel and AMD variants, in the hope
-	   that AMD flash roms ignore the Intel command. */
-	flash_write_cmd (info, 0, 0, AMD_CMD_RESET);
-	flash_write_cmd (info, 0, 0, FLASH_CMD_RESET);
 
 	for (cfi_offset=0;
 	     cfi_offset < sizeof(flash_offset_cfi) / sizeof(uint);
@@ -1649,6 +1689,10 @@ static int __flash_detect_cfi (flash_info_t * info, struct cfi_qry *qry)
 				info->addr_unlock1 = 0xaaa;
 				info->addr_unlock2 = 0x555;
 			}
+			if (/* info->vendor */ le16_to_cpu(qry->p_id) == CFI_CMDSET_SST_NEW) {
+				info->addr_unlock1 = 0x5555;
+				info->addr_unlock2 = 0x2aaa;
+			}
 
 			info->name = "CFI conformant";
 			return 1;
@@ -1662,13 +1706,37 @@ static int flash_detect_cfi (flash_info_t * info, struct cfi_qry *qry)
 {
 	debug ("flash detect cfi\n");
 
+#ifdef CONFIG_MINI2440
+	/*
+	 * This bypasses the non-working probe, force the 16x16 mode, and also
+	 * forces the startup init sequence for CFI recognition.
+	 * Michel Pollet <buserror@gmail.com>
+	 */
+	info->portwidth = CFG_FLASH_CFI_WIDTH;
+	info->chipwidth = info->portwidth;
+	
+	flash_write_cmd (info, 0, 0, AMD_CMD_RESET);	
+	flash_write_cmd (info, 0, 0x5555, 0xaa);
+	flash_write_cmd (info, 0, 0x2aaa, 0x55);
+
+	if (__flash_detect_cfi(info, qry))
+		return 1;			
+#endif
+
 	for (info->portwidth = CFG_FLASH_CFI_WIDTH;
 	     info->portwidth <= FLASH_CFI_64BIT; info->portwidth <<= 1) {
 		for (info->chipwidth = FLASH_CFI_BY8;
 		     info->chipwidth <= info->portwidth;
-		     info->chipwidth <<= 1)
+		     info->chipwidth <<= 1) {
+			/* We do not yet know what kind of commandset to use, so we issue
+			   the reset command in both Intel and AMD variants, in the hope
+			   that AMD flash roms ignore the Intel command. */
+			flash_write_cmd (info, 0, 0, AMD_CMD_RESET);
+			flash_write_cmd (info, 0, 0, FLASH_CMD_RESET);
+		     	
 			if (__flash_detect_cfi(info, qry))
-				return 1;
+				return 1;			
+		}
 	}
 	debug ("not found\n");
 	return 0;
@@ -1765,6 +1833,7 @@ ulong flash_get_size (ulong base, int banknum)
 			break;
 		case CFI_CMDSET_AMD_STANDARD:
 		case CFI_CMDSET_AMD_EXTENDED:
+		case CFI_CMDSET_SST_NEW:
 			cmdset_amd_init(info, &qry);
 			break;
 		default:
@@ -1825,9 +1894,11 @@ ulong flash_get_size (ulong base, int banknum)
 				erase_region_count, erase_region_size);
 			for (j = 0; j < erase_region_count; j++) {
 				if (sect_cnt >= CFG_MAX_FLASH_SECT) {
-					printf("ERROR: too many flash sectors\n");
+#ifndef CONFIG_MINI2440
+					printf("ERROR: too many flash sectors %d/%d max\n", sect_cnt, CFG_MAX_FLASH_SECT);
+#endif
 					break;
-				}
+				}	
 				info->start[sect_cnt] = sector;
 				sector += (erase_region_size * size_ratio);
 
@@ -1901,10 +1972,14 @@ unsigned long flash_init (void)
 		size += flash_info[i].size;
 		if (flash_info[i].flash_id == FLASH_UNKNOWN) {
 #ifndef CFG_FLASH_QUIET_TEST
+#ifdef CONFIG_MINI2440
+			printf ("NOR Flash not found. Use hardware switch and 'flinit'\n");
+#else
 			printf ("## Unknown FLASH on Bank %d "
 				"- Size = 0x%08lx = %ld MB\n",
 				i+1, flash_info[i].size,
 				flash_info[i].size << 20);
+#endif
 #endif /* CFG_FLASH_QUIET_TEST */
 		}
 #ifdef CFG_FLASH_PROTECTION
