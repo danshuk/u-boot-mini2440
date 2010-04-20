@@ -296,8 +296,9 @@ copyex:
 	str	r1, [r0]
 #endif
 
-
 #else /* i.e. 2440, 2410 and 2440 */
+
+#ifndef CONFIG_MINI2440 /* cpu_init_crit is called right afterward */
 #define LOCKTIME	0x4c000000
 #define UPLLCON		0x4c000008
 
@@ -351,6 +352,7 @@ copyex:
 	mov	r1, #0x1a
 	str	r1, [r0, #0x28]
 #endif
+#endif /* ! CONFIG_MINI2440 */
 
 #endif	/* CONFIG_S3C2400 || CONFIG_S3C2410 || CONFIG_S3C2440 || CONFIG_S3C2442
 	   CONFIG_S3C2443 */
