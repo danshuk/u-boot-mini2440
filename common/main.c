@@ -47,8 +47,12 @@ DECLARE_GLOBAL_DATA_PTR;
 /*
  * Board-specific Platform code can reimplement show_boot_progress () if needed
  */
+#ifndef CONFIG_MINI2440
 void inline __show_boot_progress (int val) {}
 void inline show_boot_progress (int val) __attribute__((weak, alias("__show_boot_progress")));
+#else
+void inline show_boot_progress (int val) {}
+#endif
 
 #if defined(CONFIG_BOOT_RETRY_TIME) && defined(CONFIG_RESET_TO_RETRY)
 extern int do_reset (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[]);		/* for do_reset() prototype */
