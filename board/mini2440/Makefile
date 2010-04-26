@@ -25,7 +25,7 @@ include $(TOPDIR)/config.mk
 
 LIB	= $(obj)lib$(BOARD).a
 
-COBJS	:= mini2440.o udc.o mega.o
+COBJS	:= mini2440.o udc.o
 SOBJS	:= lowlevel_init.o
 
 .PHONY:	all
