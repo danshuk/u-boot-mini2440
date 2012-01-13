@@ -273,30 +273,13 @@ void fw_printenv (int argc, char *argv[])
 	}
 }
 
-/*
- * Deletes or sets environment variables. Returns errno style error codes:
- * 0	  - OK
- * EINVAL - need at least 1 argument
- * EROFS  - certain variables ("ethaddr", "serial#") cannot be
- *	    modified or deleted
- *
- */
-int fw_setenv (int argc, char *argv[])
+int fw_setone(char * name, char * value)
 {
 	int i, len;
 	char *env, *nxt;
 	char *oldval = NULL;
-	char *name;
-
-	if (argc < 2) {
-		return (EINVAL);
-	}
-
-	if (env_init ())
-		return (errno);
-
-	name = argv[1];
-
+	
+	printf("setone %s=%s\n", name, value ? value : "<clear>");
 	/*
 	 * search if variable with this name already exists
 	 */
@@ -339,8 +322,8 @@ int fw_setenv (int argc, char *argv[])
 	}
 
 	/* Delete only ? */
-	if (argc < 3)
-		goto WRITE_FLASH;
+	if (!value)
+		return 0;
 
 	/*
 	 * Append new definition at the end
@@ -352,11 +335,9 @@ int fw_setenv (int argc, char *argv[])
 	 * Overflow when:
 	 * "name" + "=" + "val" +"\0\0"  > CFG_ENV_SIZE - (env-environment)
 	 */
-	len = strlen (name) + 2;
+	len = strlen (name) + 2 + strlen(value);
 	/* add '=' for first arg, ' ' for all others */
-	for (i = 2; i < argc; ++i) {
-		len += strlen (argv[i]) + 1;
-	}
+
 	if (len > (&environment.data[ENV_SIZE] - env)) {
 		fprintf (stderr,
 			"Error: environment overflow, \"%s\" deleted\n",
@@ -365,17 +346,39 @@ int fw_setenv (int argc, char *argv[])
 	}
 	while ((*env = *name++) != '\0')
 		env++;
-	for (i = 2; i < argc; ++i) {
-		char *val = argv[i];
-
-		*env = (i == 2) ? '=' : ' ';
-		while ((*++env = *val++) != '\0');
-	}
+	*env++ = '=';
+	while ((*env = *value++) != '\0')
+		env++;
 
 	/* end is marked with double '\0' */
-	*++env = '\0';
+	*env++ = '\0';
+	*env++ = '\0';
+	return 0;
+}
 
-  WRITE_FLASH:
+/*
+ * Deletes or sets environment variables. Returns errno style error codes:
+ * 0	  - OK
+ * EINVAL - need at least 1 argument
+ * EROFS  - certain variables ("ethaddr", "serial#") cannot be
+ *	    modified or deleted
+ *
+ */
+int fw_setenv (int argc, char *argv[])
+{
+	int i, len;
+	char *env, *nxt;
+	char *oldval = NULL;
+	char *name;
+
+	if (argc < 2) {
+		return (EINVAL);
+	}
+	
+	if (env_init ())
+		return (errno);
+
+	fw_setone(argv[1], argc > 2 ? argv[2] : NULL);
 
 	/* Update CRC */
 	environment.crc = crc32 (0, (uint8_t*) environment.data, ENV_SIZE);
@@ -387,6 +390,51 @@ int fw_setenv (int argc, char *argv[])
 	}
 
 	return (0);
+}
+
+int fw_loadenv (int argc, char *argv[])
+{
+	char * fname = argc > 1 ? argv[1] : "/etc/fw_env.save";
+	FILE * f = fopen(fname, "r");
+	if (!f) {
+		perror(fname);
+		return -1;
+	}
+	if (env_init ())
+		return (errno);
+	
+	char buffer[8*1024];
+	int count = 0;
+	while (fgets(buffer, sizeof(buffer), f)) {
+		if (buffer[0] == '#' || buffer[0] <= ' ')	/* crude comments */
+			continue;
+		int l = strlen(buffer);
+		/* strip newlines */
+		while (l && buffer[l-1] < ' ')
+			buffer[--l] = 0;
+		char * val = strchr(buffer, '=');
+		if (!val) {
+			printf("Invalid environment '%s'\n", buffer);
+			return -1;
+		}
+		*val++ = 0;
+		if (fw_setone(buffer, val))
+			return -1;
+		count++;
+	}
+	fclose(f);
+	/* Update CRC */
+	environment.crc = crc32 (0, (uint8_t*) environment.data, ENV_SIZE);
+
+	if (count == 0)
+		return 0;
+		
+	/* write environment back to flash */
+	if (flash_io (O_RDWR)) {
+		fprintf (stderr, "Error: can't write fw_env to flash\n");
+		return (-1);
+	}
+	return (0);	
 }
 
 static int flash_io (int mode)
@@ -407,6 +455,13 @@ static int flash_io (int mode)
 		len += sizeof (environment.flags);
 	}
 
+#if 1
+	unsigned char *block = malloc(ENV_SIZE + len);
+	if (!block) {
+		perror("memory");
+		return -1;
+	}
+#endif
 	if (mode == O_RDWR) {
 		if (HaveRedundEnv) {
 			/* switch to next partition for writing */
@@ -436,7 +491,7 @@ static int flash_io (int mode)
 
 		printf ("Done\n");
 		resid = DEVESIZE (otherdev) - CFG_ENV_SIZE;
-		if (resid) {
+		if (resid > 0) {
 			if ((data = malloc (resid)) == NULL) {
 				fprintf (stderr,
 					"Cannot malloc %d bytes: %s\n",
@@ -480,6 +535,19 @@ static int flash_io (int mode)
 				DEVNAME (otherdev), strerror (errno));
 			return (-1);
 		}
+		// Michel Pollet <buserror@gmail.com>
+		// fix the unaligned write that no longer work on modern
+		// kernels
+#if 1
+		memcpy(block, &environment, len);
+		memcpy(block + len, environment.data, ENV_SIZE);
+		if (write (fdr, block, ENV_SIZE + len) != ENV_SIZE + len) {
+			fprintf (stderr,
+				"write error on %s: %s (%x write)\n",
+				DEVNAME (otherdev), strerror (errno), ENV_SIZE + len);
+			return (-1);
+		}		
+#else 
 		if (write (fdr, &environment, len) != len) {
 			fprintf (stderr,
 				"CRC write error on %s: %s\n",
@@ -492,7 +560,8 @@ static int flash_io (int mode)
 				DEVNAME (otherdev), strerror (errno));
 			return (-1);
 		}
-		if (resid) {
+#endif
+		if (resid > 0) {
 			if (write (fdr, data, resid) != resid) {
 				fprintf (stderr,
 					"write error on %s: %s\n",
@@ -543,6 +612,17 @@ static int flash_io (int mode)
 				DEVNAME (curdev), strerror (errno));
 			return (-1);
 		}
+	
+#if 1
+		if (read (fd, block, ENV_SIZE + len) != ENV_SIZE + len) {
+			fprintf (stderr,
+				"read error on %s: %s\n",
+				DEVNAME (curdev), strerror (errno));
+			return (-1);
+		}
+		memcpy(&environment, block, len);
+		memcpy(environment.data, block + len, ENV_SIZE);
+#else
 		if (read (fd, &environment, len) != len) {
 			fprintf (stderr,
 				"CRC read error on %s: %s\n",
@@ -555,8 +635,12 @@ static int flash_io (int mode)
 				DEVNAME (curdev), strerror (errno));
 			return (-1);
 		}
+#endif
 	}
-
+#if 1
+	if (block)
+		free(block);
+#endif	
 	if (close (fd)) {
 		fprintf (stderr,
 			"I/O error on %s: %s\n",

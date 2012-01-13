@@ -50,5 +50,6 @@
 extern void  fw_printenv(int argc, char *argv[]);
 extern char *fw_getenv  (char *name);
 extern int fw_setenv  (int argc, char *argv[]);
+extern int fw_loadenv  (int argc, char *argv[]);
 
 extern unsigned	long  crc32	 (unsigned long, const unsigned char *, unsigned);

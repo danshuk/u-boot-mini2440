@@ -45,6 +45,7 @@
 
 #define	CMD_PRINTENV	"fw_printenv"
 #define CMD_SETENV	"fw_setenv"
+#define CMD_LOADENV	"fw_loadenv"
 
 int
 main(int argc, char *argv[])
@@ -65,6 +66,12 @@ main(int argc, char *argv[])
 	} else if (strcmp(cmdname, CMD_SETENV) == 0) {
 
 			if (fw_setenv (argc, argv) != 0)
+				return (EXIT_FAILURE);
+
+			return (EXIT_SUCCESS);
+	} else if (strcmp(cmdname, CMD_LOADENV) == 0) {
+
+			if (fw_loadenv (argc, argv) != 0)
 				return (EXIT_FAILURE);
 
 			return (EXIT_SUCCESS);
