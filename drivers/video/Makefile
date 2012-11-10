@@ -30,6 +30,7 @@ COBJS-y += cfb_console.o
 COBJS-y += ct69000.o
 COBJS-y += mb862xx.o
 COBJS-y += s3c2410_fb.o
+COBJS-y += s3c2440_fb.o
 COBJS-y += sed13806.o
 COBJS-y += sed156x.o
 COBJS-y += sm501.o

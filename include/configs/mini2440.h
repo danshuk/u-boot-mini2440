@@ -41,7 +41,7 @@
 #define CONFIG_S3C2410_NAND_BOOT	1
 #define CONFIG_S3C2410_NAND_SKIP_BAD	1
 
-#define CFG_UBOOT_SIZE		0x40000 /* size of u-boot, for NAND loading */
+#define CFG_UBOOT_SIZE		0x60000 /* size of u-boot, for NAND loading */
 
 /*
  * High Level Configuration Options
@@ -66,7 +66,7 @@
 
 
 #define USE_920T_MMU		1
-//#define CONFIG_USE_IRQ		1	/* Needed for USB device! */
+#define CONFIG_USE_IRQ		1	/* Needed for USB device! */
 
 /*
  * Size of malloc() pool
@@ -136,7 +136,7 @@
 #endif
 
 #define CONFIG_BOOTDELAY	3
-#define CONFIG_BOOTARGS    	"root=/dev/mtdblock3 rootfstype=jffs2 console=ttySAC0,115200"
+#define CONFIG_BOOTARGS    	"root=/dev/mtdblock4 rootfstype=jffs2 console=ttySAC0,115200"
 #define CONFIG_ETHADDR	        08:08:11:18:12:27
 #define CONFIG_NETMASK          255.255.255.0
 #define CONFIG_IPADDR		10.0.0.111
@@ -255,7 +255,7 @@
 #define CFG_ENV_SIZE		0x20000		/* 128k Total Size of Environment Sector */
 #else
 #define CFG_ENV_IS_IN_FLASH 	1
-#define CFG_MY_ENV_OFFSET 	0X40000
+#define CFG_MY_ENV_OFFSET 	0X60000
 #define CFG_ENV_ADDR		(PHYS_FLASH_1 + CFG_MY_ENV_OFFSET) /* addr of environment */
 #define CFG_ENV_SIZE		0x4000		/* 16k Total Size of Environment Sector */
 #endif
@@ -290,6 +290,36 @@
 #define CONFIG_CMDLINE_EDITING		1
 #define CONFIG_AUTO_COMPLETE		1
 
+/* Setar mod */
+//#define CONFIG_CMD_UNZIP
+#define CONFIG_VIDEO
+#define CONFIG_VIDEO_S3C2440
+#define CONFIG_CFB_CONSOLE
+//#define CFG_CONSOLE_IS_IN_ENV
+//#define CONFIG_CONSOLE_EXTRA_INFO
+#define CONFIG_CMD_BMP
+//#define CONFIG_VIDEO_BMP_LOGO
+//#define CONFIG_VIDEO_BMP_GZIP
+
+#define VIDEO_VISIBLE_COLS		240
+#define VIDEO_VISIBLE_ROWS		320
+#define VIDEO_PIXEL_SIZE		2
+
+#define CONFIG_VIDEO_LOGO
+#define CONFIG_SPLASH_SCREEN
+#define CFG_VIDEO_LOGO_MAX_SIZE         (240*320+1024+100)
+
+#define CONFIG_VGA_AS_SINGLE_DEVICE
+//#define VIDEO_FB_16BPP_PIXEL_SWAP
+#define VIDEO_KBD_INIT_FCT      0
+//#define VIDEO_TSTC_FCT          serial_tstc
+//#define VIDEO_GETC_FCT          serial_getc
+#define LCD_VIDEO_ADDR			0x33d00000
+
+
+//#define CFG_BOOTMENU
+/*  end Setar mod */
+
 #define CONFIG_S3C2410_NAND_BBT		1	
 //#define CONFIG_S3C2440_NAND_HWECC	1	/* this works for generation, not verification */
 
@@ -297,17 +327,17 @@
 #define CFG_NAND_YAFFS1_NEW_OOB_LAYOUT
 
 #define MTDIDS_DEFAULT		"nand0=mini2440-nand"
-#define MTPDARTS_DEFAULT		"mtdparts=mtdparts=mini2440-nand:256k@0(u-boot),128k(env),5m(kernel),-(root)"
+#define MTPDARTS_DEFAULT		"mtdparts=mtdparts=mini2440-nand:384k@0(u-boot),128k(u-boot_env),5m(kernel),256k(splash),-(rootfs)"
 #define CFG_NAND_DYNPART_MTD_KERNEL_NAME "mini2440-nand"
 #define CONFIG_NAND_DYNPART	1
 
 #define CONFIG_EXTRA_ENV_SETTINGS	\
 	"usbtty=cdc_acm\0" \
-	"mtdparts=mtdparts=mini2440-nand:256k@0(u-boot),128k(env),5m(kernel),-(root)\0" \
+	"mtdparts=mtdparts=mini2440-nand:384k@0(u-boot),128k(u-boot_env),5m(kernel),256k(splash),-(rootfs)\0" \
 	"mini2440=mini2440=0tb\0" \
 	"bootargs_base=console=ttySAC0,115200 noinitrd\0" \
 	"bootargs_init=init=/sbin/init\0" \
-	"root_nand=root=/dev/mtdblock3 rootfstype=jffs2\0" \
+	"root_nand=root=/dev/mtdblock4 rootfstype=jffs2\0" \
 	"root_mmc=root=/dev/mmcblk0p2 rootdelay=2\0" \
 	"root_nfs=/mnt/nfs\0" \
 	"set_root_nfs=setenv root_nfs root=/dev/nfs rw nfsroot=${serverip}:${root_nfs}\0" \
@@ -317,6 +347,9 @@
 	"set_bootargs_mmc=setenv bootargs ${bootargs_base} ${bootargs_init} ${mini2440} ${root_mmc}\0" \
 	"set_bootargs_nand=setenv bootargs ${bootargs_base} ${bootargs_init} ${mini2440} ${root_nand}\0" \
 	"set_bootargs_nfs=run set_root_nfs\; setenv bootargs ${bootargs_base} ${bootargs_init} ${mini2440} ${root_nfs} ${ifconfig}\0" \
+	"splashimage=nand read 0x32000000 splash\; bmp display 0x32000000\0" \
+	"uboot_reflash=nand erase u-boot\; nand write 0x32000000 u-boot\0" \
+	"splash_reflash=nand erase splash\; nand write 0x32000000 splash\0" \
 	""	
 
 #endif	/* __CONFIG_H */

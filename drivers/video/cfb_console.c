@@ -1276,7 +1276,7 @@ static void *video_logo (void)
 
 	logo_plot (video_fb_address, VIDEO_COLS, 0, 0);
 
-	sprintf (info, " %s", &version_string);
+//	sprintf (info, " %s", &version_string);
 	video_drawstring (VIDEO_INFO_X, VIDEO_INFO_Y, (uchar *)info);
 
 #ifdef CONFIG_CONSOLE_EXTRA_INFO

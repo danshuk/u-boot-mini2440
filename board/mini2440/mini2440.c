@@ -144,8 +144,9 @@ int board_init (void)
 		(0x0 << 28) | // GPG14	EINT18	IN
 		(0x0 << 30) | // GPG15	EINT18	IN
 		0;
-	gpio->GPGUP = (1 << 15) -1;	// disable pullups for all pins
-	
+	gpio->GPGUP = ((1 << 15) -1) // disable pullups for all pins
+    		    & ~(1 << 4) // Pull-up lcd
+		    ;
 	gpio->GPHCON = 
 		(0x2 <<  0) | // GPH0	nCTS0			---
 		(0x2 <<  2) | // GPH1	nRTS0			---
@@ -199,13 +200,14 @@ int board_init (void)
 
 
 //TFT 240320
-#define LCD_XSIZE_TFT_240320 	(240)	
-#define LCD_YSIZE_TFT_240320 	(320)
+//#define LCD_XSIZE_TFT_240320 	(240)	
+//#define LCD_YSIZE_TFT_240320 	(320)
 
 //TFT240320
-#define HOZVAL_TFT_240320	(LCD_XSIZE_TFT_240320-1)
-#define LINEVAL_TFT_240320	(LCD_YSIZE_TFT_240320-1)
+//#define HOZVAL_TFT_240320	(LCD_XSIZE_TFT_240320-1)
+//#define LINEVAL_TFT_240320	(LCD_YSIZE_TFT_240320-1)
 
+/*
 //Timing parameter for NEC3.5"
 #define VBPD_240320		(3)		
 #define VFPD_240320		(10)
@@ -217,7 +219,20 @@ int board_init (void)
 
 #define CLKVAL_TFT_240320	(3) 	
 //FCLK=101.25MHz,HCLK=50.625MHz,VCLK=6.33MHz
+*/
 
+#define LCD_WIDTH		(240)
+#define LCD_HEIGHT		(320)
+
+#define LCD_UPPER_MARGIN	(1)
+#define LCD_LOWER_MARGIN	(1)
+#define LCD_VSYNC_LEN		(1)
+
+#define LCD_RIGHT_MARGIN	(1)
+#define LCD_LEFT_MARGIN		(1)
+#define LCD_HSYNC_LEN		(27)
+
+#define CLKVAL_TFT_240320	(1) 	
 
 void board_video_init(GraphicDevice *pGD) 
 { 
@@ -226,8 +241,9 @@ void board_video_init(GraphicDevice *pGD)
     /* FIXME: select LCM type by env variable */ 
 	 
 	/* Configuration for GTA01 LCM on QT2410 */ 
-	lcd->LCDCON1 = 0x00000378; /* CLKVAL=4, BPPMODE=16bpp, TFT, ENVID=0 */ 
-	
+
+//	lcd->LCDCON1 = 0x00000378; /* CLKVAL=4, BPPMODE=16bpp, TFT, ENVID=0 */ 
+/*	
 //    lcd->LCDCON2 = 0x014fc141; 
 //	lcd->LCDCON3 = 0x0098ef13; 
 //	lcd->LCDCON4 = 0x00000d05; 
@@ -236,8 +252,14 @@ void board_video_init(GraphicDevice *pGD)
 	lcd->LCDCON2 = (VBPD_240320<<24)|(LINEVAL_TFT_240320<<14)|(VFPD_240320<<6)|(VSPW_240320); 
 	lcd->LCDCON3 = (HBPD_240320<<19)|(HOZVAL_TFT_240320<<8)|(HFPD_240320); 
 	lcd->LCDCON4 = (MVAL<<8)|(HSPW_240320); 
-	
-   
+*/
+
+    lcd->LCDCON1 = 0x00000378; /* CLKVAL=4, BPPMODE=16bpp, TFT, ENVID=0 */ 
+    lcd->LCDCON2 = (LCD_UPPER_MARGIN << 24) | ((LCD_HEIGHT - 1) << 14) | (LCD_LOWER_MARGIN << 6) | (LCD_VSYNC_LEN << 0); 
+    lcd->LCDCON3 = (LCD_RIGHT_MARGIN << 19) | ((LCD_WIDTH  - 1) <<  8) | (LCD_LEFT_MARGIN << 0); 
+    lcd->LCDCON4 = (MVAL<<8) | (LCD_HSYNC_LEN << 0); 
+    lcd->LCDCON5 = 0x00000f09; 
+
     lcd->LPCSEL  = 0x00000000; 
 } 
 
@@ -257,8 +279,6 @@ int dram_init (void)
 /* The sum of all part_size[]s must equal to the NAND size, i.e., 0x4000000 */
 
 unsigned int dynpart_size[] = {
-    CFG_UBOOT_SIZE, 0x20000, 0x500000, 0xffffffff, 0 };
+    CFG_UBOOT_SIZE, 0x20000, 0x500000, 0x40000 ,0xffffffff, 0 };
 char *dynpart_names[] = {
-    "u-boot", "u-boot_env", "kernel", "rootfs", NULL };
-
-
+    "u-boot", "u-boot_env", "kernel", "splash", "rootfs", NULL };
